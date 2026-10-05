@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>宇宙送電シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: 上にレポートの章タブ、各章は「左＝操作パネル／右＝図と数値」。狭い画面では縦に積む */
+:root{
+  --bg:#edf0f4; --surface:#ffffff; --ink:#172030; --muted:#566275; --line:#d4dae3; --soft:#e4e9f0;
+  --accent:#1d5ccc; --laser:#d1382a; --micro:#c47510; --wire:#2f7a55; --cloud:#c3cad4; --sun:#e0a800;
+  --good:#23824a; --warn:#a86a0c; --bad:#c0352b;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e131a; --surface:#161d27; --ink:#e5eaf1; --muted:#97a2b2; --line:#2a3443; --soft:#1e2733;
+    --accent:#6c9fff; --laser:#ff6a58; --micro:#f0a43a; --wire:#5cc08d; --cloud:#4a5463; --sun:#f5c842;
+    --good:#4cc27a; --warn:#e3a53b; --bad:#ff6a5c; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --surface:#161d27; --ink:#e5eaf1; --muted:#97a2b2; --line:#2a3443; --soft:#1e2733;
+  --accent:#6c9fff; --laser:#ff6a58; --micro:#f0a43a; --wire:#5cc08d; --cloud:#4a5463; --sun:#f5c842;
+  --good:#4cc27a; --warn:#e3a53b; --bad:#ff6a5c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px}
+header.top{padding-block:28px 0;border-bottom:1px solid var(--line);background:var(--surface)}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0 0 4px}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(26px,4vw,38px);line-height:1.2;margin:0;text-wrap:balance}
+h1 .beam{color:var(--laser)}
+.lead{color:var(--muted);margin:8px 0 18px;max-width:62ch}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;margin-inline:-16px;padding-inline:16px}
+.tabs button{font:inherit;font-size:14px;border:0;background:none;color:var(--muted);padding:10px 14px 12px;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;display:flex;gap:8px;align-items:baseline}
+.tabs button .no{font-family:var(--f-mono);font-size:12px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.tabs button:hover{color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:24px 48px}
+.intro{max-width:70ch;margin-bottom:18px}
+h2{font-family:var(--f-display);font-weight:700;font-size:22px;margin:0 0 4px;text-wrap:balance}
+h3{font-family:var(--f-display);font-size:16px;margin:0 0 8px}
+.intro p{margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.controls{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font-family:var(--f-mono);font-size:13px;color:var(--accent);font-variant-numeric:tabular-nums;text-align:right}
+.ctl input[type=range]{width:100%;accent-color:var(--accent)}
+.ctl select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.ctl .hint{font-size:12px;color:var(--muted);margin:2px 0 0;line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button,.btn{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);cursor:pointer}
+.chips button:hover,.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.solid{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:700}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+.sep{border:0;border-top:1px solid var(--line);margin:2px 0}
+.viz{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0}
+.card h3 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+canvas{display:block;width:100%}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:0}
+.stats>div{background:var(--surface);padding:10px 12px;min-width:0}
+.stats dt{font-size:12px;color:var(--muted)}
+.stats dd{margin:0;font-family:var(--f-mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.stats dd small{font-size:12px;font-weight:400;color:var(--muted)}
+.pill{display:inline-block;font-family:var(--f-body);font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;border:1px solid currentColor}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.note{font-size:13px;color:var(--muted);margin:0;max-width:75ch}
+.formula{font-family:var(--f-mono);font-size:13px;background:var(--soft);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:pre;line-height:1.8;font-variant-numeric:tabular-nums}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.chain{display:flex;flex-direction:column;gap:6px}
+.chain .row{display:grid;grid-template-columns:9.5em minmax(0,1fr) 5.5em;gap:8px;align-items:center;font-size:12.5px}
+.chain .bar{height:12px;background:var(--soft);border-radius:3px;overflow:hidden}
+.chain .bar i{display:block;height:100%}
+.chain .v{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.compare .m{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface)}
+.compare .m.me{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.compare .m b{font-family:var(--f-display);font-size:15px}
+.compare .m .big{font-family:var(--f-mono);font-size:22px;font-weight:600}
+.compare .m p{margin:2px 0;font-size:12.5px;color:var(--muted)}
+.sensors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-width:280px}
+.sensors div{font-family:var(--f-mono);font-size:12px;background:var(--soft);border-radius:4px;padding:4px 8px;position:relative;overflow:hidden}
+.sensors div i{position:absolute;left:0;top:0;bottom:0;background:var(--sun);opacity:.35}
+.sensors div span{position:relative}
+table.meas{border-collapse:collapse;font-size:13px;width:100%}
+table.meas th,table.meas td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}
+table.meas input{width:100%;font:inherit;font-family:var(--f-mono);font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.codewrap{position:relative}
+.codewrap .btn{position:absolute;top:8px;right:8px}
+pre.code{font-family:var(--f-mono);font-size:12.5px;background:var(--soft);border-radius:6px;padding:12px;overflow-x:auto;margin:0;line-height:1.55}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:6px}
+.legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:5px;vertical-align:middle;background:var(--c)}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">レポート「宇宙エレベーターを使った宇宙からの送電方法の検討」の付録</p>
+    <h1>宇宙送電<span class="beam">シミュレーター</span></h1>
+    <p class="lead">レポートの各章で使った計算や仕組みを、数値を動かして確かめられます。効率などは概算のモデル値なので、傾向を見るために使ってください。</p>
+    <nav class="tabs" role="tablist" aria-label="章">
+      <button role="tab" data-tab="beam" aria-selected="true"><span class="no">§2</span>大気の窓とビームの広がり</button>
+      <button role="tab" data-tab="mwl"><span class="no">§3</span>マイクロ波とレーザー</button>
+      <button role="tab" data-tab="wire"><span class="no">§4</span>有線送電の計算</button>
+      <button role="tab" data-tab="track"><span class="no">§5</span>ビームのずれ対策</button>
+      <button role="tab" data-tab="relay"><span class="no">§6</span>中継方式</button>
+      <button role="tab" data-tab="exp"><span class="no">§7</span>実験シミュレーション</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- §2 -->
+<section class="panel" id="p-beam" role="tabpanel">
+  <div class="intro">
+    <h2>大気の窓とビームの広がり</h2>
+    <p>波長を動かすと、その電磁波が大気を通れるか、地上でビームがどこまで広がるかが変わります。ビーム直径は 2.44 × 波長 × 距離 ÷ アンテナ直径 で計算しています。</p>
+  </div>
+  <div class="grid">
+    <div class="controls">
+      <div class="ctl"><label for="b-lam">波長 <output id="b-lam-o"></output></label>
+        <input type="range" id="b-lam" min="-11" max="1.5" step="0.01" value="-1.3">
+        <div class="chips" id="b-presets" style="margin-top:6px">
+          <button data-l="1e-10">X線</button><button data-l="2e-7">紫外線</button><button data-l="1.06e-6">レーザー 1µm</button>
+          <button data-l="5e-3">ミリ波</button><button data-l="0.1224">2.45GHz</button><button data-l="0.0517">5.8GHz</button><button data-l="3">FM 3m</button>
+        </div>
+      </div>
+      <div class="ctl"><label for="b-D">送信アンテナ（鏡）の直径 <output id="b-D-o"></output></label>
+        <input type="range" id="b-D" min="0" max="4" step="0.01" value="3"></div>
+      <div class="ctl"><label for="b-L">送る距離 <output id="b-L-o"></output></label>
+        <input type="range" id="b-L" min="1" max="4.5563" step="any" value="4.5563">
+        <p class="hint">右端が静止軌道から地上まで（約3万6千km）</p></div>
+      <hr class="sep">
+      <p class="note">レーザーは計算上かなり細く絞れますが、実際は大気のゆらぎで数m〜数十mに広がります。</p>
+    </div>
+    <div class="viz">
+      <dl class="stats">
+        <div><dt>分類</dt><dd id="b-band"></dd></div>
+        <div><dt>周波数</dt><dd id="b-f"></dd></div>
+        <div><dt>地上でのビーム直径</dt><dd id="b-d"></dd></div>
+        <div><dt>1GW を送ったときの平均の強さ</dt><dd id="b-dens"></dd></div>
+      </dl>
+      <div class="card"><h3>大気の窓<small>縦軸＝地上まで届く割合（概略）</small></h3><canvas id="b-cv1"></canvas>
+        <p class="note" id="b-note" style="margin-top:6px"></p></div>
+      <div class="card"><h3>地上でのビームの大きさ<small>対数目盛り</small></h3><canvas id="b-cv2"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- §3 -->
+<section class="panel" id="p-mwl" role="tabpanel" hidden>
+  <div class="intro">
+    <h2>マイクロ波とレーザーの比較</h2>
+    <p>宇宙で 1,000MW（原発1基分）の電気を作ったとき、地上でどれだけ電気に戻るかを、各段階の効率をかけ算して比べます。天気と、レーザーを受け取る高さを変えてみてください。</p>
+  </div>
+  <div class="grid">
+    <div class="controls">
+      <div class="ctl"><label for="m-wx">天気</label>
+        <select id="m-wx"><option value="clear">快晴</option><option value="thin">うすい雲（高さ2〜8km）</option><option value="thick" selected>厚い雲（高さ1〜12km）</option><option value="rain">雨雲（高さ1〜12km）</option></select></div>
+      <div class="ctl"><label for="m-h">レーザーを受け取る高さ <output id="m-h-o"></output></label>
+        <input type="range" id="m-h" min="0" max="25" step="0.5" value="0">
+        <p class="hint">0km＝地上で受ける。宇宙エレベーターならテザーの途中に受信所を置ける</p></div>
+      <hr class="sep">
+      <p class="note" style="font-weight:700;color:var(--ink)">効率の仮定（§6でも使います）</p>
+      <div class="ctl"><label for="m-el">電気 → レーザー <output id="m-el-o"></output></label>
+        <input type="range" id="m-el" min="10" max="80" step="1" value="50"></div>
+      <div class="ctl"><label for="m-pv">レーザー → 電気（太陽電池） <output id="m-pv-o"></output></label>
+        <input type="range" id="m-pv" min="10" max="70" step="1" value="50">
+        <p class="hint">単色光に合わせた太陽電池は普通の太陽光より効率が高くなる</p></div>
+      <div class="ctl"><label for="m-em">電気 → マイクロ波 <output id="m-em-o"></output></label>
+        <input type="range" id="m-em" min="40" max="90" step="1" value="80"></div>
+      <div class="ctl"><label for="m-rc">マイクロ波 → 電気（レクテナ） <output id="m-rc-o"></output></label>
+        <input type="range" id="m-rc" min="40" max="90" step="1" value="80"></div>
+    </div>
+    <div class="viz">
+      <div class="card"><h3>空から見た送電の様子<small>高さは 0〜25km を拡大して表示</small></h3><canvas id="m-cv"></canvas></div>
+      <div class="two">
+        <div class="card"><h3 style="color:var(--micro)">マイクロ波（5.8GHz）</h3><div class="chain" id="m-chain-mw"></div></div>
+        <div class="card"><h3 style="color:var(--laser)">レーザー（1µm）</h3><div class="chain" id="m-chain-l"></div></div>
+      </div>
+      <dl class="stats">
+        <div><dt>マイクロ波の受信設備</dt><dd id="m-rx-mw"></dd></div>
+        <div><dt>レーザーの受信設備</dt><dd id="m-rx-l"></dd></div>
+        <div><dt>マイクロ波の強さ（太陽光比）</dt><dd id="m-dn-mw"></dd></div>
+        <div><dt>レーザーの強さ（太陽光比）</dt><dd id="m-dn-l"></dd></div>
+      </dl>
+      <p class="note">太陽光比は「地上に届く太陽光（約1kW/m²）の何倍の強さか」。レーザーは細く強いため、目や物に当たると危険です。</p>
+    </div>
+  </div>
+</section>
+
+<!-- §4 -->
+<section class="panel" id="p-wire" role="tabpanel" hidden>
+  <div class="intro">
+    <h2>有線送電の計算</h2>
+    <p>ロスを決められた割合以内に抑えるために必要な電線の太さと重さを計算します。もう一つ、電流を流しすぎると電線が熱くなるので、電流密度の上限（目安 2A/mm²）からも太さを決め、太い方を採用します。</p>
+  </div>
+  <div class="grid">
+    <div class="controls">
+      <div class="chips"><button id="w-pre-all">全区間を有線（3万6千km）</button><button id="w-pre-20">中継区間だけ（20km）</button></div>
+      <div class="ctl"><label for="w-P">送る電力 <output id="w-P-o"></output></label>
+        <input type="range" id="w-P" min="100" max="3000" step="100" value="1000"></div>
+      <div class="ctl"><label for="w-V">電圧 <output id="w-V-o"></output></label>
+        <input type="range" id="w-V" min="5" max="7" step="0.01" value="6"></div>
+      <div class="ctl"><label for="w-L">電線の長さ <output id="w-L-o"></output></label>
+        <input type="range" id="w-L" min="0" max="4.5563" step="any" value="4.5563"></div>
+      <div class="ctl"><label for="w-loss">許せるロス <output id="w-loss-o"></output></label>
+        <input type="range" id="w-loss" min="1" max="30" step="1" value="10"></div>
+      <div class="ctl"><label for="w-mat">素材</label>
+        <select id="w-mat"><option value="cu">銅</option><option value="al" selected>アルミニウム</option><option value="cnt">カーボンナノチューブ繊維（目安）</option></select></div>
+      <div class="ctl"><label for="w-J">電流密度の上限 <output id="w-J-o"></output></label>
+        <input type="range" id="w-J" min="0.5" max="10" step="0.5" value="2">
+        <p class="hint">真空や薄い空気の中では熱が逃げにくいので、地上より小さめに考える</p></div>
+    </div>
+    <div class="viz">
+      <dl class="stats">
+        <div><dt>電流</dt><dd id="w-I"></dd></div>
+        <div><dt>必要な断面積</dt><dd id="w-A"></dd></div>
+        <div><dt>電線の重さ</dt><dd id="w-M"></dd></div>
+        <div><dt>テザー本体（数千〜数万t）と比べると</dt><dd id="w-cmp"></dd></div>
+      </dl>
+      <div class="formula" id="w-formula"></div>
+      <div class="card"><h3>電圧と電線の重さ<small>今の素材・長さ・ロスで計算。両軸とも対数目盛り</small></h3><canvas id="w-cv"></canvas>
+        <div class="legend"><span style="--c:var(--accent)">ロスの条件から決まる重さ</span><span style="--c:var(--warn)">発熱の条件から決まる重さ</span><span style="--c:var(--cloud)">テザー本体の重さの範囲</span></div></div>
+      <p class="note" id="w-note"></p>
+    </div>
+  </div>
+</section>
+
+<!-- §5 -->
+<section class="panel" id="p-track" role="tabpanel" hidden>
+  <div class="intro">
+    <h2>ビームのずれ対策</h2>
+    <p>テザーの揺れで受信ステーション（30m角）が動きます。パイロット信号・フィードバック制御・補償光学・安全装置を順にオンにして、受信できる割合がどう変わるか見てください。信号は静止軌道まで片道 0.12 秒かかるので、その分遅れて届きます。</p>
+  </div>
+  <div class="grid">
+    <div class="controls">
+      <div class="ctl"><label for="t-amp">テザーの揺れの大きさ <output id="t-amp-o"></output></label>
+        <input type="range" id="t-amp" min="0" max="60" step="1" value="30"></div>
+      <div class="ctl"><label for="t-f">揺れの速さ <output id="t-f-o"></output></label>
+        <input type="range" id="t-f" min="0.02" max="0.5" step="0.01" value="0.12">
+        <p class="hint">見やすいよう実際より速くしています</p></div>
+      <div class="ctl"><label for="t-turb">大気のゆらぎ <output id="t-turb-o"></output></label>
+        <input type="range" id="t-turb" min="0" max="15" step="0.5" value="5"></div>
+      <hr class="sep">
+      <label class="toggle"><input type="checkbox" id="t-pilot" checked>① パイロット信号（目印の光）</label>
+      <label class="toggle"><input type="checkbox" id="t-fb">② フィードバック制御（鏡を高速で直す）</label>
+      <div class="ctl"><label for="t-k">制御の強さ <output id="t-k-o"></output></label>
+        <input type="range" id="t-k" min="1" max="20" step="0.5" value="5">
+        <p class="hint">強くしすぎると、0.12秒の遅れのせいで行き過ぎて揺れ始めます</p></div>
+      <label class="toggle"><input type="checkbox" id="t-ao">補償光学（大気のゆらぎを打ち消す）</label>
+      <label class="toggle"><input type="checkbox" id="t-safe" checked>③ 安全装置</label>
+      <div class="chips"><button id="t-plane">飛行機を近づける</button><button id="t-lose">パイロット信号を途切れさせる</button><button id="t-reset">リセット</button></div>
+    </div>
+    <div class="viz">
+      <dl class="stats">
+        <div><dt>状態</dt><dd id="t-state"></dd></div>
+        <div><dt>いまの受信率</dt><dd id="t-now"></dd></div>
+        <div><dt>直近20秒の平均</dt><dd id="t-avg"></dd></div>
+        <div><dt>飛行機への照射</dt><dd id="t-hits"></dd></div>
+      </dl>
+      <div class="two">
+        <div class="card"><h3>受信ステーションから見たビーム<small>±80m の範囲</small></h3><canvas id="t-cv1"></canvas></div>
+        <div class="card"><h3>受信率の変化<small>直近20秒</small></h3><canvas id="t-cv2"></canvas>
+          <p class="note" style="margin-top:8px">外れた光は周りに当たってしまう光です。受信率が低いほど危険で、無駄も多くなります。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §6 -->
+<section class="panel" id="p-relay" role="tabpanel" hidden>
+  <div class="intro">
+    <h2>中継方式：レーザー＋テザーの電線</h2>
+    <p>受信ステーションの高さを変えると、雲の影響（レーザー区間）と電線の重さ（電線区間）のバランスが変わります。電線は電圧100万V・アルミを基本に、§4 と同じ方法で計算しています。</p>
+  </div>
+  <div class="grid">
+    <div class="controls">
+      <div class="ctl"><label for="r-h">受信ステーションの高さ <output id="r-h-o"></output></label>
+        <input type="range" id="r-h" min="0" max="40" step="0.5" value="20"></div>
+      <div class="ctl"><label for="r-wx">天気</label>
+        <select id="r-wx"><option value="clear">快晴</option><option value="thin">うすい雲（高さ2〜8km）</option><option value="thick" selected>厚い雲（高さ1〜12km）</option><option value="rain">雨雲（高さ1〜12km）</option></select></div>
+      <div class="ctl"><label for="r-V">電線の電圧 <output id="r-V-o"></output></label>
+        <input type="range" id="r-V" min="5" max="7" step="0.01" value="6"></div>
+      <div class="ctl"><label for="r-loss">電線区間で許せるロス <output id="r-loss-o"></output></label>
+        <input type="range" id="r-loss" min="1" max="20" step="1" value="5"></div>
+      <div class="ctl"><label for="r-mat">電線の素材</label>
+        <select id="r-mat"><option value="cu">銅</option><option value="al" selected>アルミニウム</option><option value="cnt">カーボンナノチューブ繊維（目安）</option></select></div>
+      <p class="note">レーザーとマイクロ波の効率の仮定は §3 のタブで変えられます。</p>
+    </div>
+    <div class="viz">
+      <div class="compare" id="r-cmp"></div>
+      <div class="card"><h3>受信の高さと全体の効率<small>天気ごと。宇宙で作った電気のうち地上の変電所に届く割合</small></h3><canvas id="r-cv1"></canvas>
+        <div class="legend"><span style="--c:var(--good)">快晴</span><span style="--c:var(--accent)">うすい雲</span><span style="--c:var(--warn)">厚い雲</span><span style="--c:var(--bad)">雨雲</span></div></div>
+      <div class="card"><h3>受信の高さと電線の重さ<small>対数目盛り</small></h3><canvas id="r-cv2"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- §7 -->
+<section class="panel" id="p-exp" role="tabpanel" hidden>
+  <div class="intro">
+    <h2>実験シミュレーション</h2>
+    <p>レポート §7 の2つの実験を、実際に作る前に試せます。実験1は予想値と測定値を並べて比べられ、実験2はそのまま Arduino に書き込めるプログラムを出します。</p>
+  </div>
+
+  <h3 style="font-size:18px;margin-top:8px">実験1：レーザーポインターと小さな太陽電池</h3>
+  <div class="grid" style="margin-bottom:32px">
+    <div class="controls">
+      <div class="ctl"><label for="e-d">距離 <output id="e-d-o"></output></label>
+        <input type="range" id="e-d" min="0.1" max="10" step="0.1" value="2"></div>
+      <div class="ctl"><label for="e-obs">さえぎる物</label>
+        <select id="e-obs"><option value="none">なし</option><option value="glass">透明なガラス</option><option value="fog" selected>水蒸気（加湿器の霧）</option><option value="frost">すりガラス</option></select></div>
+      <div class="ctl"><label for="e-fog">霧の濃さ <output id="e-fog-o"></output></label>
+        <input type="range" id="e-fog" min="0" max="100" step="5" value="40"></div>
+      <div class="ctl"><label for="e-div">ビームの広がり角 <output id="e-div-o"></output></label>
+        <input type="range" id="e-div" min="0.3" max="3" step="0.1" value="1"></div>
+      <div class="ctl"><label for="e-cell">太陽電池の大きさ（一辺） <output id="e-cell-o"></output></label>
+        <input type="range" id="e-cell" min="5" max="40" step="1" value="10"></div>
+      <p class="note">レーザーは 1mW（クラス2）、太陽電池の効率は 20% と仮定。レーザーは人の目に絶対に向けないこと。</p>
+    </div>
+    <div class="viz">
+      <dl class="stats">
+        <div><dt>太陽電池に当たる光</dt><dd id="e-frac"></dd></div>
+        <div><dt>発電量の予想</dt><dd id="e-pw"></dd></div>
+        <div><dt>太陽電池の位置での光の直径</dt><dd id="e-spot"></dd></div>
+      </dl>
+      <div class="card"><h3>距離と当たる光の割合<small>縦軸は対数目盛り。● は入力した測定値</small></h3><canvas id="e-cv"></canvas>
+        <div class="legend"><span style="--c:var(--muted)">なし</span><span style="--c:var(--accent)">透明なガラス</span><span style="--c:var(--micro)">水蒸気</span><span style="--c:var(--laser)">すりガラス</span></div></div>
+      <div class="card">
+        <h3>測定値の記録<small>1行目を基準に、相対値で予想と比べます（このブラウザに保存）</small></h3>
+        <table class="meas"><thead><tr><th>距離 [m]</th><th>測定値（mV など）</th><th>予想との比</th></tr></thead><tbody id="e-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size:18px">実験2：4つの光センサーとサーボで自動追尾</h3>
+  <div class="grid">
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" id="q-auto" checked>光源を自動で動かす</label>
+      <p class="hint" style="margin:-8px 0 0;font-size:12px;color:var(--muted)">オフにすると、図をドラッグして光源を動かせます</p>
+      <div class="ctl"><label for="q-spd">光源の速さ <output id="q-spd-o"></output></label>
+        <input type="range" id="q-spd" min="1" max="40" step="1" value="10"></div>
+      <hr class="sep">
+      <div class="ctl"><label for="q-div">感度（差を割る数） <output id="q-div-o"></output></label>
+        <input type="range" id="q-div" min="5" max="200" step="5" value="40">
+        <p class="hint">小さいほど一度に大きく動く。小さすぎると行ったり来たりする</p></div>
+      <div class="ctl"><label for="q-max">1回に動かす最大角度 <output id="q-max-o"></output></label>
+        <input type="range" id="q-max" min="1" max="10" step="1" value="3"></div>
+      <div class="ctl"><label for="q-tol">不感帯 <output id="q-tol-o"></output></label>
+        <input type="range" id="q-tol" min="0" max="200" step="5" value="30">
+        <p class="hint">差がこれ以下なら動かさない（細かい震えを防ぐ）</p></div>
+      <div class="ctl"><label for="q-dly">ループの待ち時間 <output id="q-dly-o"></output></label>
+        <input type="range" id="q-dly" min="10" max="200" step="10" value="30"></div>
+      <div class="ctl"><label for="q-noise">センサーのノイズ <output id="q-noise-o"></output></label>
+        <input type="range" id="q-noise" min="0" max="60" step="2" value="10"></div>
+    </div>
+    <div class="viz">
+      <dl class="stats">
+        <div><dt>状態</dt><dd id="q-state"></dd></div>
+        <div><dt>光源とのずれ</dt><dd id="q-err"></dd></div>
+        <div><dt>サーボ角（パン, チルト）</dt><dd id="q-servo"></dd></div>
+      </dl>
+      <div class="two">
+        <div class="card"><h3>センサーから見た空<small>±60°</small></h3><canvas id="q-cv" style="touch-action:none;cursor:crosshair"></canvas></div>
+        <div class="card"><h3>センサーの値<small>analogRead（0〜1023）</small></h3>
+          <div class="sensors" id="q-sens"></div>
+          <p class="note" style="margin-top:10px">右のセンサーが明るければ右へ、上が明るければ上へ回します。左右・上下でそれぞれ「合計の差」を取るのがポイントです。</p>
+        </div>
+      </div>
+      <div class="card"><h3>Arduino のプログラム<small>今の設定値が入ります。A0〜A3 に光センサー、9・10番ピンにサーボ</small></h3>
+        <div class="codewrap"><button class="btn" id="q-copy">コピー</button><pre class="code" id="q-code"></pre></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MONO = '"IBM Plex Mono", ui-monospace, monospace';
+const SANS = '"Noto Sans JP", "Hiragino Sans", sans-serif';
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const lg = Math.log10;
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x));}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function sig(v, n=3){ if(!isFinite(v)) return '∞'; if(v===0) return '0'; const d=Math.max(0, n-1-Math.floor(lg(Math.abs(v)))); return Number(v.toFixed(Math.min(d,6))).toLocaleString('ja-JP',{maximumFractionDigits:6}); }
+function jp(v, unit=''){ // 日本語の万・億
+  const a=Math.abs(v);
+  if(a>=1e12) return sig(v/1e12)+'兆'+unit;
+  if(a>=1e8) return sig(v/1e8)+'億'+unit;
+  if(a>=1e4) return sig(v/1e4)+'万'+unit;
+  return sig(v)+unit;
+}
+function fmtLen(m){ const a=Math.abs(m);
+  if(a>=1000) return jp(m/1000)+' km'; if(a>=1) return sig(m)+' m'; if(a>=0.01) return sig(m*100)+' cm';
+  if(a>=1e-3) return sig(m*1e3)+' mm'; if(a>=1e-6) return sig(m*1e6)+' µm'; if(a>=1e-9) return sig(m*1e9)+' nm'; return sig(m*1e12)+' pm'; }
+function fmtFreq(f){ const u=[[1e18,'EHz'],[1e15,'PHz'],[1e12,'THz'],[1e9,'GHz'],[1e6,'MHz'],[1e3,'kHz']]; for(const [k,s] of u) if(f>=k) return sig(f/k)+' '+s; return sig(f)+' Hz'; }
+function fmtMass(kg){ const t=kg/1000; if(t>=1) return jp(t)+' トン'; return sig(kg)+' kg'; }
+function fmtV(v){ return v>=1e4 ? jp(v)+' V' : sig(v)+' V'; }
+
+function canvas(cv, h){
+  const w = cv.clientWidth || cv.parentElement.clientWidth; const dpr = window.devicePixelRatio||1;
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); cv.style.height = h+'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  return {ctx, w, h};
+}
+function axes(ctx, o){
+  const sx = v => o.xlog ? (lg(v)-lg(o.xmin))/(lg(o.xmax)-lg(o.xmin)) : (v-o.xmin)/(o.xmax-o.xmin);
+  const sy = v => o.ylog ? (lg(v)-lg(o.ymin))/(lg(o.ymax)-lg(o.ymin)) : (v-o.ymin)/(o.ymax-o.ymin);
+  const X = v => o.x0 + sx(v)*o.w, Y = v => o.y0 + o.h - sy(v)*o.h;
+  ctx.save(); ctx.font = '11px '+MONO; ctx.lineWidth = 1;
+  ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--muted');
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  (o.xticks||[]).forEach(t => { const x=Math.round(X(t))+.5; ctx.beginPath(); ctx.moveTo(x,o.y0); ctx.lineTo(x,o.y0+o.h); ctx.stroke(); ctx.fillText(o.xfmt?o.xfmt(t):t, x, o.y0+o.h+5); });
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  (o.yticks||[]).forEach(t => { const y=Math.round(Y(t))+.5; ctx.beginPath(); ctx.moveTo(o.x0,y); ctx.lineTo(o.x0+o.w,y); ctx.stroke(); ctx.fillText(o.yfmt?o.yfmt(t):t, o.x0-6, y); });
+  ctx.font = '12px '+SANS;
+  if(o.xlabel){ ctx.textAlign='right'; ctx.textBaseline='top'; ctx.fillText(o.xlabel, o.x0+o.w, o.y0+o.h+20); }
+    ctx.restore();
+  return {X, Y};
+}
+function line(ctx, pts, color, width=2, dash){ ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=width; if(dash) ctx.setLineDash(dash); ctx.beginPath(); let started=false; pts.forEach(([x,y])=>{ if(!isFinite(y)||!isFinite(x)) {started=false;return;} started?ctx.lineTo(x,y):ctx.moveTo(x,y); started=true;}); ctx.stroke(); ctx.restore(); }
+function dot(ctx,x,y,r,fill,stroke){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();} }
+function label(ctx, text, x, y, color, align='left', base='middle', font='12px '+SANS){ ctx.save(); ctx.font=font; ctx.fillStyle=color; ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(text,x,y); ctx.restore(); }
+function bind(ids, fn){ ids.forEach(id => { const el=$('#'+id); el.addEventListener('input', fn); el.addEventListener('change', fn); }); }
+const val = id => parseFloat($('#'+id).value);
+const out = (id, txt) => { $('#'+id+'-o').textContent = txt; };
+
+// ---------- 共通モデル ----------
+const MAT = { cu:{name:'銅', rho:1.7e-8, dens:8960}, al:{name:'アルミニウム', rho:2.8e-8, dens:2700}, cnt:{name:'CNT繊維', rho:1e-7, dens:1400} };
+function wireCalc(P, V, L, loss, mat, Jmax){
+  const m = MAT[mat]; const I = P/V; const R = loss*P/(I*I);
+  const Aloss = m.rho*L/R; const Aheat = I/(Jmax*1e6);
+  const A = Math.max(Aloss, Aheat);
+  return { I, R, Aloss, Aheat, A, mass: A*L*m.dens, massLoss: Aloss*L*m.dens, massHeat: Aheat*L*m.dens, by: Aloss>=Aheat?'loss':'heat', m };
+}
+const CLOUD = { clear:null, thin:[2,8], thick:[1,12], rain:[1,12] };
+const CLOUD_T = { clear:1, thin:0.35, thick:0.002, rain:0.0005 };
+const WXNAME = { clear:'快晴', thin:'うすい雲', thick:'厚い雲', rain:'雨雲' };
+function airT(h){ return Math.exp(-0.14*Math.exp(-h/8)); } // 晴れた空気の通りやすさ（1µm、概算）
+function laserAtm(h, wx){ const c=CLOUD[wx]; let t=airT(h); if(c && h < c[1]) t *= CLOUD_T[wx]; return t; }
+const MW_ATM = { clear:0.98, thin:0.98, thick:0.96, rain:0.88 };
+const eff = () => ({ el:val('m-el')/100, pv:val('m-pv')/100, em:val('m-em')/100, rc:val('m-rc')/100, capL:0.95, capM:0.90 });
+function laserChain(h, wx){ const e=eff(); return e.el*e.capL*laserAtm(h,wx)*e.pv; }
+function mwChain(wx){ const e=eff(); return e.em*e.capM*MW_ATM[wx]*e.rc; }
+const MW_RX = 2.44*0.0517*36000e3/1000; // 5.8GHz, 1kmアンテナ
+const L_RX = 30;
+
+// ---------- §2 ビーム ----------
+function bandOf(l){
+  if(l<1e-8) return ['ガンマ線・X線','×','bad','空気に吸収され地上に届かない。人体に有害で、作る効率も約1%と低い。'];
+  if(l<4e-7) return ['紫外線','×','bad','大気（オゾン層など）に吸収されやすい。'];
+  if(l<1.1e-6) return ['可視光・近赤外線','△','warn','「光の窓」を通る。ただし雲で止まる。レーザー送電の候補。'];
+  if(l<1e-3) return ['赤外線（中・遠赤外）','×','bad','水蒸気や二酸化炭素に吸収される帯域が多い（レポートの表にない区間）。'];
+  if(l<1e-2) return ['ミリ波','△','warn','雨で弱まる。'];
+  if(l<=0.1) return ['マイクロ波','○','good','雲もほぼ通り抜ける。ビームの広がりもまだ現実的。宇宙太陽光発電の本命。'];
+  if(l<=10) return ['UHFより長い電波','×','bad','大気は通るが、ビームが広がりすぎて受け止めきれない。'];
+  return ['短波より長い電波','×','bad','電離層で反射され、地上まで届かない。'];
+}
+function atmT(l){ const u=l*1e6;
+  if(u<0.29) return 0; if(u<0.4) return 0.85*(u-0.29)/0.11; if(u<1.1) return 0.85;
+  if(u<2.5) return 0.5+0.25*Math.cos((u-1.1)*8); if(u<3.5) return 0.08; if(u<5) return 0.45; if(u<8) return 0.04; if(u<13) return 0.7;
+  if(u<500) return 0.03; if(u<1000) return 0.15; if(u<1e4) return 0.5+0.3*(lg(u)-3);
+  if(u<1e7) return 0.97; if(u<3e7) return 0.97*(1-(lg(u)-7)/lg(3)); return 0; }
+function beam(){
+  const l = 10**val('b-lam'), D = 10**val('b-D'), L = 10**val('b-L')*1000;
+  out('b-lam', fmtLen(l)); out('b-D', fmtLen(D)); out('b-L', fmtLen(L));
+  const d = 2.44*l*L/D; const b = bandOf(l);
+  $('#b-band').innerHTML = `<span class="${b[2]}">${b[1]}</span> <small>${b[0]}</small>`;
+  $('#b-f').textContent = fmtFreq(3e8/l);
+  $('#b-d').textContent = fmtLen(d);
+  const dens = 1e9/(Math.PI*d*d/4);
+  $('#b-dens').innerHTML = (dens>=1e3? jp(dens/1e3)+' kW/m²' : sig(dens)+' W/m²') + ` <small>太陽光の${dens/1000>=1? jp(dens/1000)+'倍' : sig(dens/1000)+'倍'}</small>`;
+  $('#b-note').innerHTML = `<b class="${b[2]}">${b[0]}：</b>${b[3]}`;
+  // 大気の窓
+  { const cv=$('#b-cv1'); const {ctx,w,h}=canvas(cv, 190); const x0=40, pw=w-56, y0=14, ph=110;
+    const lmin=-11, lmax=1.5; const X = v => x0 + (v-lmin)/(lmax-lmin)*pw;
+    const A = axes(ctx,{x0,y0,w:pw,h:ph,xmin:1e-11,xmax:10**1.5,xlog:true,ymin:0,ymax:1,
+      xticks:[1e-10,1e-8,1e-6,1e-4,1e-2,1], xfmt:t=>fmtLen(t).replace(' ',''), yticks:[0,.5,1], yfmt:t=>t*100+'%'});
+    ctx.beginPath(); ctx.moveTo(x0, y0+ph);
+    for(let px=0; px<=pw; px++){ const lv = lmin+(lmax-lmin)*px/pw; ctx.lineTo(x0+px, A.Y(atmT(10**lv))); }
+    ctx.lineTo(x0+pw, y0+ph); ctx.closePath(); ctx.fillStyle=css('--accent'); ctx.globalAlpha=.18; ctx.fill(); ctx.globalAlpha=1;
+    ctx.beginPath(); for(let px=0; px<=pw; px++){ const lv=lmin+(lmax-lmin)*px/pw; const y=A.Y(atmT(10**lv)); px?ctx.lineTo(x0+px,y):ctx.moveTo(x0+px,y);} ctx.strokeStyle=css('--accent'); ctx.lineWidth=1.5; ctx.stroke();
+    const bands=[[-10,'X線'],[-7.3,'紫外'],[-6.2,'光'],[-4.5,'赤外'],[-2.5,'ミリ波'],[-1.5,'マイクロ波'],[0.4,'電波']];
+    bands.forEach(([v,t])=>label(ctx,t,X(v),y0+ph+30,css('--muted'),'center','top','11px '+SANS));
+    const xm = X(val('b-lam')); ctx.strokeStyle=css('--laser'); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(xm,y0-4); ctx.lineTo(xm,y0+ph); ctx.stroke();
+    dot(ctx,xm,A.Y(atmT(l)),5,css('--laser'),css('--surface'));
+  }
+  // ビームの大きさ
+  { const cv=$('#b-cv2'); const {ctx,w,h}=canvas(cv, 130); const x0=16, pw=w-32, yb=70;
+    const lmin=-2, lmax=7; const X = v => x0 + (clamp(lg(v),lmin,lmax)-lmin)/(lmax-lmin)*pw;
+    ctx.strokeStyle=css('--line'); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,yb); ctx.lineTo(x0+pw,yb); ctx.stroke();
+    for(let e=lmin;e<=lmax;e++){ const x=X(10**e); ctx.beginPath(); ctx.moveTo(x,yb-4); ctx.lineTo(x,yb+4); ctx.stroke(); label(ctx, fmtLen(10**e).replace(' ',''), x, yb+8, css('--muted'), 'center','top','10px '+MONO); }
+    const refs=[[1.7,'人'],[105,'サッカー場'],[MW_RX,'レクテナ想定'],[4e4,'富士山のすそ野'],[3e6,'日本列島の長さ']];
+    refs.forEach(([v,t],i)=>{ const x=X(v); const up=i%2===0; ctx.fillStyle=css('--muted'); ctx.fillRect(x-1, up?yb-14:yb+22, 2, 8); label(ctx,t,x, up?yb-16:yb+32, css('--muted'),'center', up?'bottom':'top','11px '+SANS); });
+    const xd = X(d); ctx.fillStyle=css('--laser'); ctx.beginPath(); ctx.moveTo(xd,yb-2); ctx.lineTo(xd-6,yb-14); ctx.lineTo(xd+6,yb-14); ctx.fill();
+    label(ctx,'この条件：'+fmtLen(d), clamp(xd, x0+60, x0+pw-60), 14, css('--laser'),'center','middle','600 12px '+SANS);
+  }
+}
+bind(['b-lam','b-D','b-L'], beam);
+$('#b-presets').addEventListener('click', e => { const l=e.target.dataset.l; if(!l) return; $('#b-lam').value = lg(parseFloat(l)); beam(); });
+
+// ---------- §3 マイクロ波 vs レーザー ----------
+function chainHTML(rows, color){
+  return rows.map(([n,v,sub])=>`<div class="row"><span>${n}${sub?`<br><small style="color:var(--muted)">${sub}</small>`:''}</span><span class="bar"><i style="width:${clamp(v/1000*100,0,100)}%;background:${color}"></i></span><span class="v">${v>=10?Math.round(v):sig(v,2)} MW</span></div>`).join('');
+}
+function mwl(){
+  const wx=$('#m-wx').value, hh=val('m-h'); const e=eff();
+  out('m-h', hh+' km'); out('m-el', Math.round(e.el*100)+'%'); out('m-pv', Math.round(e.pv*100)+'%'); out('m-em', Math.round(e.em*100)+'%'); out('m-rc', Math.round(e.rc*100)+'%');
+  const P=1000; const m1=P*e.em, m2=m1*e.capM, m3=m2*MW_ATM[wx], m4=m3*e.rc;
+  const l1=P*e.el, l2=l1*e.capL, la=laserAtm(hh,wx), l3=l2*la, l4=l3*e.pv;
+  $('#m-chain-mw').innerHTML = chainHTML([['宇宙で発電',P],['マイクロ波に変換',m1],['受信設備に入る',m2,'ビームの端は外れる'],['大気を通過',m3,WXNAME[wx]],['電気に戻す',m4]], 'var(--micro)');
+  $('#m-chain-l').innerHTML = chainHTML([['宇宙で発電',P],['レーザーに変換',l1],['受信設備に入る',l2],['大気を通過',l3,`${WXNAME[wx]}・高さ${hh}km`],['電気に戻す',l4]], 'var(--laser)');
+  $('#m-rx-mw').innerHTML = `直径 約${fmtLen(MW_RX)}`;
+  $('#m-rx-l').innerHTML = `直径 約${L_RX} m <small>${hh>0?`高さ${hh}kmの受信所`:'地上'}</small>`;
+  const dM = m3*1e6/(Math.PI*MW_RX**2/4), dL = l3*1e6/(Math.PI*L_RX**2/4);
+  $('#m-dn-mw').innerHTML = `${sig(dM/1000,2)}倍 <small>${sig(dM)} W/m²</small>`;
+  $('#m-dn-l').innerHTML = `<span class="${dL>5e3?'bad':''}">${jp(dL/1000)}倍</span> <small>${jp(dL/1000)} kW/m²</small>`;
+  // 図
+  const cv=$('#m-cv'); const {ctx,w,h}=canvas(cv, 300); const top=24, ground=h-34, Hmax=25;
+  const Y = km => ground - (km/Hmax)*(ground-top);
+  ctx.fillStyle=css('--soft'); ctx.fillRect(0,ground,w,h-ground);
+  ctx.strokeStyle=css('--line'); ctx.beginPath(); ctx.moveTo(0,ground+.5); ctx.lineTo(w,ground+.5); ctx.stroke();
+  [0,5,10,15,20,25].forEach(k=>{ label(ctx,k+'km',4,Y(k),css('--muted'),'left','middle','10px '+MONO); });
+  const mx=w*0.3, lx=w*0.72;
+  label(ctx,'↑ 静止軌道（約3万6千km）から',w/2,10,css('--muted'),'center','middle','11px '+SANS);
+  // 雲
+  const c=CLOUD[wx];
+  if(c){ ctx.save(); ctx.fillStyle=css('--cloud'); ctx.globalAlpha = wx==='thin'?.45:.8;
+    const y1=Y(c[1]), y0=Y(c[0]); ctx.fillRect(40,y1+8,w-40,y0-y1-8);
+    for(let x=40;x<w+20;x+=34){ ctx.beginPath(); ctx.ellipse(x, y1+10, 24, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(x+17, y0, 22, 8, 0, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
+    if(wx==='rain'){ ctx.save(); ctx.strokeStyle=css('--accent'); ctx.globalAlpha=.5; ctx.lineWidth=1; for(let i=0;i<70;i++){ const x=40+((i*53)%(w-40)), y=Y(c[0])+((i*37)%Math.max(1,(ground-Y(c[0])-10))); ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-3,y+9); ctx.stroke(); } ctx.restore(); }
+  }
+  // マイクロ波ビーム
+  ctx.save(); ctx.fillStyle=css('--micro'); ctx.globalAlpha=.22*(MW_ATM[wx]);
+  ctx.beginPath(); ctx.moveTo(mx-25,top); ctx.lineTo(mx+25,top); ctx.lineTo(mx+w*0.17,ground); ctx.lineTo(mx-w*0.17,ground); ctx.fill(); ctx.restore();
+  ctx.fillStyle=css('--micro'); ctx.fillRect(mx-w*0.17, ground, w*0.34, 6);
+  label(ctx,'マイクロ波',mx,top+12,css('--micro'),'center','middle','700 12px '+SANS);
+  label(ctx,'レクテナ 直径 約'+fmtLen(MW_RX),mx,ground+20,css('--micro'),'center','middle','11px '+SANS);
+  // テザー
+  ctx.save(); ctx.strokeStyle=css('--muted'); ctx.setLineDash([3,4]); ctx.beginPath(); ctx.moveTo(lx+18,top); ctx.lineTo(lx+18,ground); ctx.stroke(); ctx.restore();
+  label(ctx,'テザー',lx+24,Y(22),css('--muted'),'left','middle','11px '+SANS);
+  // レーザー
+  const yr=Y(hh); ctx.save(); ctx.strokeStyle=css('--laser'); ctx.lineWidth=3;
+  if(c && hh<c[1]){ const yc=Y(c[1]); ctx.beginPath(); ctx.moveTo(lx,top); ctx.lineTo(lx,yc); ctx.stroke(); ctx.globalAlpha=Math.max(.08, CLOUD_T[wx]); ctx.beginPath(); ctx.moveTo(lx,yc); ctx.lineTo(lx,yr); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.moveTo(lx,top); ctx.lineTo(lx,yr); ctx.stroke(); }
+  ctx.restore();
+  label(ctx,'レーザー',lx-8,top+12,css('--laser'),'right','middle','700 12px '+SANS);
+  if(hh>0){ ctx.fillStyle=css('--accent'); ctx.fillRect(lx-14,yr,40,6); ctx.strokeStyle=css('--wire'); ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(lx+18,yr+6); ctx.lineTo(lx+18,ground); ctx.stroke();
+    label(ctx,`受信所 ${hh}km`,lx+32,yr+3,css('--accent'),'left','middle','600 11px '+SANS); label(ctx,'電線',lx+24,(yr+ground)/2,css('--wire'),'left','middle','11px '+SANS); }
+  else { ctx.fillStyle=css('--laser'); ctx.fillRect(lx-12,ground,24,6); }
+  label(ctx,`届く割合 ${sig(la*100,2)}%`,lx-10,Math.min(ground-10,yr+18),css('--laser'),'right','middle','11px '+MONO);
+  relay();
+}
+bind(['m-wx','m-h','m-el','m-pv','m-em','m-rc'], mwl);
+
+// ---------- §4 有線 ----------
+function wire(){
+  const P=val('w-P')*1e6, V=10**val('w-V'), L=10**val('w-L')*1000, loss=val('w-loss')/100, mat=$('#w-mat').value, J=val('w-J');
+  out('w-P', jp(P/1e3)+' kW'); out('w-V', fmtV(V)); out('w-L', fmtLen(L)); out('w-loss', Math.round(loss*100)+'%'); out('w-J', J+' A/mm²');
+  const r = wireCalc(P,V,L,loss,mat,J);
+  $('#w-I').textContent = sig(r.I)+' A';
+  const cm2 = r.A*1e4;
+  $('#w-A').innerHTML = (cm2>=1? sig(cm2)+' cm²' : sig(r.A*1e6)+' mm²') + ` <small>${r.by==='loss'?'ロスで決定':'発熱で決定'}</small>`;
+  $('#w-M').textContent = fmtMass(r.mass);
+  const t=r.mass/1000; let cls, txt;
+  if(t>1e5){cls='bad';txt=`テザー（1万トンとして）の${jp(t/1e4)}倍`;} else if(t>1e3){cls='warn';txt='テザーと同じくらい';} else {cls='good';txt=`テザーの${sig(t/1e3*100,2)}%以下`;}
+  $('#w-cmp').innerHTML = `<span class="${cls}">${txt}</span>`;
+  $('#w-formula').textContent =
+`I = P ÷ V = ${jp(P)}W ÷ ${jp(V)}V = ${sig(r.I)} A
+ロスの上限 = ${jp(P*loss)}W  →  R = P_loss ÷ I² = ${sig(r.R)} Ω
+ロスの条件  A = ρL ÷ R = ${r.m.rho.toExponential(1)} × ${jp(L)}m ÷ ${sig(r.R)}Ω = ${r.Aloss*1e4>=1? sig(r.Aloss*1e4)+' cm²' : sig(r.Aloss*1e6)+' mm²'}
+発熱の条件  A = I ÷ J = ${sig(r.I)}A ÷ ${J}A/mm² = ${sig(r.Aheat*1e6)} mm²
+重さ = A × L × 密度(${r.m.dens} kg/m³) = ${fmtMass(r.mass)}`;
+  // 図
+  const cv=$('#w-cv'); const {ctx,w,h}=canvas(cv, 260); const x0=64, y0=16, pw=w-x0-16, ph=h-60;
+  const Vs=[]; for(let e=5;e<=7.0001;e+=0.02) Vs.push(10**e);
+  const pts = Vs.map(v=>wireCalc(P,v,L,loss,mat,J));
+  const all = pts.flatMap(p=>[p.massLoss/1000,p.massHeat/1000]).concat([1e3,1e5]);
+  let ymin=10**Math.floor(lg(Math.min(...all))), ymax=10**Math.ceil(lg(Math.max(...all)));
+  if(ymax/ymin<100) ymax=ymin*100;
+  const yt=[]; const step=Math.max(1,Math.ceil((lg(ymax)-lg(ymin))/6)); for(let e=lg(ymin);e<=lg(ymax)+1e-9;e+=step) yt.push(10**e);
+  const A=axes(ctx,{x0,y0,w:pw,h:ph,xmin:1e5,xmax:1e7,xlog:true,ymin,ymax,ylog:true,
+    xticks:pw>480?[1e5,2e5,5e5,1e6,2e6,5e6,1e7]:[1e5,1e6,1e7], xfmt:t=>jp(t), yticks:yt, yfmt:t=>t>=1?jp(t)+'t':sig(t*1000)+'kg', xlabel:'電圧 [V]'});
+  ctx.save(); ctx.fillStyle=css('--cloud'); ctx.globalAlpha=.35; const yb1=A.Y(Math.min(1e5,ymax)), yb0=A.Y(Math.max(1e3,ymin)); ctx.fillRect(x0,yb1,pw,yb0-yb1); ctx.restore();
+  label(ctx,'テザー本体',x0+6,(yb1+yb0)/2,css('--muted'),'left','middle','11px '+SANS);
+  line(ctx, Vs.map((v,i)=>[A.X(v),A.Y(pts[i].massLoss/1000)]), css('--accent'), 2);
+  line(ctx, Vs.map((v,i)=>[A.X(v),A.Y(pts[i].massHeat/1000)]), css('--warn'), 2, [5,4]);
+  dot(ctx, A.X(V), A.Y(r.mass/1000), 6, css('--laser'), css('--surface'));
+  label(ctx, fmtMass(r.mass), A.X(V)+10, A.Y(r.mass/1000)-12, css('--laser'), A.X(V)>x0+pw-90?'right':'left','middle','600 12px '+SANS);
+  const note = L<1e5
+    ? '短い区間では、ロスの条件だけなら電線はとても細くて済みますが、1000Aも流すと発熱で切れてしまいます。実際の太さは発熱（電流密度）で決まることが多いです。'
+    : '長い区間では、ロスの条件で電線が非常に太くなります。電圧を10倍にするとロスの条件で決まる重さは 1/100 になりますが、発熱の条件で決まる重さは 1/10 にしかなりません。';
+  $('#w-note').textContent = note;
+}
+bind(['w-P','w-V','w-L','w-loss','w-mat','w-J'], wire);
+$('#w-pre-all').onclick = () => { $('#w-L').value=4.5563; wire(); };
+$('#w-pre-20').onclick = () => { $('#w-L').value=lg(20); wire(); };
+
+// ---------- §5 追尾 ----------
+const T = {};
+function trackReset(){ Object.assign(T,{t:0, aim:{x:0,y:0}, jit:{x:0,y:0}, hist:[], trail:[], pow:[], plane:null, hits:0, planeHit:false, lostUntil:-1, acc:0}); }
+trackReset();
+function sample(arr, t){ // 遅れた時刻の値
+  if(!arr.length) return null; for(let i=arr.length-1;i>=0;i--) if(arr[i].t<=t) return arr[i]; return arr[0]; }
+function trackStep(dt){
+  const amp=val('t-amp'), f=val('t-f'), turb=val('t-turb'), pilot=$('#t-pilot').checked, fb=$('#t-fb').checked, ao=$('#t-ao').checked, safe=$('#t-safe').checked, K=val('t-k');
+  T.t += dt; const t=T.t, tau=0.12;
+  const tg = { x: amp*Math.sin(2*Math.PI*f*t), y: 0.5*amp*Math.sin(2*Math.PI*f*0.73*t+1.2) };
+  const s = turb*(ao?0.15:1), tc=0.4;
+  T.jit.x += -T.jit.x/tc*dt + s*Math.sqrt(2*dt/tc)*gauss(); T.jit.y += -T.jit.y/tc*dt + s*Math.sqrt(2*dt/tc)*gauss();
+  T.hist.push({t, tx:tg.x, ty:tg.y, ax:T.aim.x, ay:T.aim.y}); while(T.hist.length && T.hist[0].t < t-1) T.hist.shift();
+  const lost = t < T.lostUntil;
+  if(pilot && !lost){ const d = sample(T.hist, t-tau);
+    const w0 = 0.6; let vx = w0*(d.tx-T.aim.x), vy = w0*(d.ty-T.aim.y);
+    if(fb){ vx += K*(d.tx-d.ax); vy += K*(d.ty-d.ay); }
+    T.aim.x += vx*dt; T.aim.y += vy*dt; }
+  const spot = { x: T.aim.x + T.jit.x - tg.x, y: T.aim.y + T.jit.y - tg.y };
+  // 飛行機
+  if(T.plane){ T.plane.x += 70*dt; if(T.plane.x>130){ T.plane=null; T.planeHit=false; } }
+  const near = T.plane && Math.hypot(T.plane.x-spot.x, T.plane.y-spot.y) < 45;
+  const interlock = safe && ((pilot && lost) || near);
+  const on = !interlock;
+  if(on && T.plane && !T.planeHit && Math.hypot(T.plane.x-spot.x, T.plane.y-spot.y) < 12){ T.hits++; T.planeHit=true; }
+  const a=15, sg=5, k=sg*Math.SQRT2;
+  const F = on ? 0.25*(erf((a-spot.x)/k)+erf((a+spot.x)/k))*(erf((a-spot.y)/k)+erf((a+spot.y)/k)) : 0;
+  T.spot=spot; T.on=on; T.F=F; T.lost=lost; T.near=near; T.interlock=interlock;
+  T.acc += dt; if(T.acc>=1/30){ T.acc=0; T.pow.push({t,F,on}); T.trail.push({...spot}); while(T.pow.length && T.pow[0].t<t-20) T.pow.shift(); while(T.trail.length>60) T.trail.shift(); }
+}
+function trackDraw(){
+  out('t-amp', val('t-amp')+' m'); out('t-f', val('t-f')+' Hz'); out('t-turb', val('t-turb')+' m'); out('t-k', val('t-k'));
+  $('#t-k').disabled = !$('#t-fb').checked;
+  let st;
+  if(T.interlock) st = `<span class="pill warn">安全停止中</span> <small>${T.near?'飛行機が接近':'目印の信号が途切れた'}</small>`;
+  else if(T.lost) st = `<span class="pill bad">信号なしで照射中</span>`;
+  else if(T.plane) st = `<span class="pill bad">飛行機の近くで照射中</span>`;
+  else st = `<span class="pill good">送電中</span>`;
+  $('#t-state').innerHTML = st;
+  $('#t-now').textContent = (T.F*100).toFixed(0)+'%';
+  const avg = T.pow.length ? T.pow.reduce((s,p)=>s+p.F,0)/T.pow.length : 0;
+  $('#t-avg').textContent = (avg*100).toFixed(0)+'%';
+  $('#t-hits').innerHTML = T.hits ? `<span class="bad">${T.hits}回</span>` : '<span class="good">0回</span>';
+  // 受信面ビュー
+  { const cv=$('#t-cv1'); const sz=Math.min(cv.parentElement.clientWidth-28, 360); cv.style.width=sz+'px'; const {ctx,w,h}=canvas(cv, sz);
+    const R=80, S=w/(2*R), X=x=>w/2+x*S, Y=y=>h/2-y*S;
+    ctx.strokeStyle=css('--line'); ctx.lineWidth=1; for(let g=-80;g<=80;g+=20){ ctx.beginPath(); ctx.moveTo(X(g),0); ctx.lineTo(X(g),h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,Y(g)); ctx.lineTo(w,Y(g)); ctx.stroke(); }
+    ctx.fillStyle=css('--accent'); ctx.globalAlpha=.14; ctx.fillRect(X(-15),Y(15),30*S,30*S); ctx.globalAlpha=1; ctx.strokeStyle=css('--accent'); ctx.lineWidth=2; ctx.strokeRect(X(-15),Y(15),30*S,30*S);
+    label(ctx,'受信面 30m',X(-15),Y(15)-8,css('--accent'),'left','middle','11px '+SANS);
+    if(T.trail.length>1){ ctx.save(); ctx.globalAlpha=.4; line(ctx, T.trail.map(p=>[X(p.x),Y(p.y)]), css('--laser'), 1.2); ctx.restore(); }
+    if(T.spot){ const sx=X(T.spot.x), sy=Y(T.spot.y);
+      if(T.on){ const g=ctx.createRadialGradient(sx,sy,0,sx,sy,12*S); const lc=css('--laser'); g.addColorStop(0,lc); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,12*S,0,Math.PI*2); ctx.fill(); dot(ctx,sx,sy,2.5,css('--surface')); }
+      else { ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css('--muted'); ctx.beginPath(); ctx.arc(sx,sy,10*S,0,Math.PI*2); ctx.stroke(); ctx.restore(); label(ctx,'停止',sx,sy,css('--muted'),'center','middle','11px '+SANS); } }
+    if(T.plane){ const px=X(T.plane.x), py=Y(T.plane.y); ctx.save(); ctx.translate(px,py); ctx.fillStyle=css('--ink'); ctx.beginPath(); ctx.moveTo(12,0); ctx.lineTo(-10,-4); ctx.lineTo(-10,4); ctx.closePath(); ctx.fill(); ctx.fillRect(-3,-12,5,24); ctx.fillRect(-11,-6,3,12); ctx.restore(); }
+    ctx.strokeStyle=css('--muted'); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(50),h-12); ctx.lineTo(X(70),h-12); ctx.stroke(); label(ctx,'20m',X(60),h-20,css('--muted'),'center','bottom','10px '+MONO);
+  }
+  { const cv=$('#t-cv2'); const {ctx,w,h}=canvas(cv, 220); const x0=40,y0=10,pw=w-52,ph=h-40; const t=T.t;
+    const A=axes(ctx,{x0,y0,w:pw,h:ph,xmin:-20,xmax:0,ymin:0,ymax:100,xticks:[-20,-15,-10,-5,0],xfmt:v=>v+'s',yticks:[0,25,50,75,100],yfmt:v=>v+'%'});
+    if(T.pow.length>1){ ctx.beginPath(); ctx.moveTo(A.X(T.pow[0].t-t),A.Y(0)); T.pow.forEach(p=>ctx.lineTo(A.X(p.t-t),A.Y(p.F*100))); ctx.lineTo(A.X(0),A.Y(0)); ctx.closePath(); ctx.fillStyle=css('--accent'); ctx.globalAlpha=.15; ctx.fill(); ctx.globalAlpha=1;
+      line(ctx, T.pow.map(p=>[A.X(p.t-t),A.Y(p.F*100)]), css('--accent'), 2);
+      ctx.fillStyle=css('--warn'); ctx.globalAlpha=.25; T.pow.forEach(p=>{ if(!p.on) ctx.fillRect(A.X(p.t-t)-1.5,y0,3,ph); }); ctx.globalAlpha=1; }
+  }
+}
+$('#t-plane').onclick = () => { T.plane = { x:-130, y:(Math.random()-.5)*40 }; T.planeHit=false; };
+$('#t-lose').onclick = () => { T.lostUntil = T.t + 3; };
+$('#t-reset').onclick = () => trackReset();
+
+// ---------- §6 中継 ----------
+function relay(){
+  const hh=val('r-h'), wx=$('#r-wx').value, V=10**val('r-V'), loss=val('r-loss')/100, mat=$('#r-mat').value;
+  out('r-h', hh+' km'); out('r-V', fmtV(V)); out('r-loss', Math.round(loss*100)+'%');
+  const P=1e9, J=2;
+  const lc = laserChain(hh,wx); const wr = hh>0 ? wireCalc(lc*P, V, hh*1000, loss, mat, J) : null;
+  const relayEff = lc*(hh>0?(1-loss):1);
+  const direct = laserChain(0,wx), mw = mwChain(wx);
+  const full = wireCalc(P, V, 36000e3, loss, mat, J);
+  const card = (name, effv, rows, me) => `<div class="m${me?' me':''}"><b>${name}</b><div class="big ${effv<0.05?'bad':effv<0.2?'warn':'good'}">${sig(effv*100,2)}%</div>${rows.map(r=>`<p>${r}</p>`).join('')}</div>`;
+  $('#r-cmp').innerHTML =
+    card(`中継方式（${hh}km）`, relayEff, [`受信設備：直径約${L_RX}m（${hh}km）`, `電線：${wr?fmtMass(wr.mass):'なし'}`], true) +
+    card('レーザーを地上で受信', direct, [`受信設備：直径約${L_RX}m`, `雲：${CLOUD[wx]?'止まる':'影響なし'}`]) +
+    card('マイクロ波', mw, [`受信設備：直径約${fmtLen(MW_RX)}`, '雲：ほぼ通る']) +
+    card('全区間を有線', 1-loss, [`電線：${fmtMass(full.mass)}`, '<span class="bad">テザーが支えられない</span>']);
+  const hs=[]; for(let x=0;x<=40.0001;x+=0.25) hs.push(x);
+  const colors={clear:'--good',thin:'--accent',thick:'--warn',rain:'--bad'};
+  { const cv=$('#r-cv1'); const {ctx,w,h}=canvas(cv, 230); const x0=44,y0=12,pw=w-60,ph=h-46;
+    const top = Math.ceil(Math.max(mw, ...Object.keys(CLOUD).map(k=>laserChain(40,k)))*100/10)*10;
+    const A=axes(ctx,{x0,y0,w:pw,h:ph,xmin:0,xmax:40,ymin:0,ymax:top,xticks:[0,5,10,15,20,25,30,35,40],xfmt:v=>v+'km',yticks:[0,top/4,top/2,top*3/4,top],yfmt:v=>Math.round(v)+'%',xlabel:'受信ステーションの高さ'});
+    const c=CLOUD[wx]; if(c){ ctx.fillStyle=css('--cloud'); ctx.globalAlpha=.3; ctx.fillRect(A.X(c[0]),y0,A.X(c[1])-A.X(c[0]),ph); ctx.globalAlpha=1; label(ctx,'雲',A.X((c[0]+c[1])/2),y0+ph-10,css('--muted'),'center','middle','11px '+SANS); }
+    line(ctx,[[A.X(0),A.Y(mw*100)],[A.X(40),A.Y(mw*100)]],css('--micro'),1.5,[6,4]); label(ctx,'マイクロ波',A.X(40)-4,A.Y(mw*100)-8,css('--micro'),'right','middle','11px '+SANS);
+    Object.keys(CLOUD).forEach(k=>{ const sel=k===wx; ctx.save(); ctx.globalAlpha=sel?1:.35;
+      line(ctx, hs.map(x=>[A.X(x),A.Y(laserChain(x,k)*(x>0?(1-loss):1)*100)]), css(colors[k]), sel?2.5:1.5); ctx.restore(); });
+    ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle=css('--ink'); ctx.beginPath(); ctx.moveTo(A.X(hh),y0); ctx.lineTo(A.X(hh),y0+ph); ctx.stroke(); ctx.restore();
+    dot(ctx,A.X(hh),A.Y(relayEff*100),5,css(colors[wx]),css('--surface'));
+  }
+  { const cv=$('#r-cv2'); const {ctx,w,h}=canvas(cv, 200); const x0=64,y0=12,pw=w-80,ph=h-46;
+    const ms = hs.map(x=> x>0 ? wireCalc(laserChain(x,'clear')*P, V, x*1000, loss, mat, J).mass/1000 : NaN);
+    const fin = ms.filter(isFinite); let ymin=10**Math.floor(lg(Math.min(...fin))), ymax=10**Math.ceil(lg(Math.max(...fin))); if(ymax/ymin<100) ymax=ymin*100;
+    const yt=[]; for(let e=lg(ymin);e<=lg(ymax)+1e-9;e++) yt.push(10**e);
+    const A=axes(ctx,{x0,y0,w:pw,h:ph,xmin:0,xmax:40,ymin,ymax,ylog:true,xticks:[0,5,10,15,20,25,30,35,40],xfmt:v=>v+'km',yticks:yt,yfmt:t=>t>=1?jp(t)+'t':sig(t*1000)+'kg',xlabel:'受信ステーションの高さ'});
+    line(ctx, hs.map((x,i)=>[A.X(x),A.Y(ms[i])]), css('--wire'), 2.5);
+    if(wr){ dot(ctx,A.X(hh),A.Y(wr.mass/1000),5,css('--wire'),css('--surface')); label(ctx,fmtMass(wr.mass),A.X(hh)+8,A.Y(wr.mass/1000)-12,css('--wire'),A.X(hh)>x0+pw-80?'right':'left','middle','600 12px '+SANS); }
+  }
+}
+bind(['r-h','r-wx','r-V','r-loss','r-mat'], relay);
+
+// ---------- §7 実験1 ----------
+const OBS = { none:'--muted', glass:'--accent', fog:'--micro', frost:'--laser' };
+function e1frac(d, obs, fog, div, cell){
+  const r = 1e-3 + d*div*1e-3/2, s = r/2, a = cell*1e-3/2;
+  const capt = erf(a/(s*Math.SQRT2))**2;
+  if(obs==='none') return capt;
+  if(obs==='glass') return capt*0.92;
+  if(obs==='fog') return capt*Math.exp(-fog/100*6*0.3);
+  // すりガラス（レーザーから5cm）：まっすぐ通る光3%、残りは±15°に散らばる
+  const R = 1e-3 + Math.max(0,d-0.05)*Math.tan(15*Math.PI/180);
+  return 0.03*capt + 0.85*Math.min(1, (cell*1e-3)**2/(Math.PI*R*R));
+}
+let MEAS = [];
+try { MEAS = JSON.parse(localStorage.getItem('sps-meas')||'[]'); } catch(e) {}
+if(!Array.isArray(MEAS) || MEAS.length!==5) MEAS = [['0.5',''],['1',''],['2',''],['4',''],['8','']];
+$('#e-tbody').innerHTML = MEAS.map((r,i)=>`<tr><td><input id="md${i}" inputmode="decimal" value="${r[0]}" aria-label="距離${i+1}"></td><td><input id="mv${i}" inputmode="decimal" value="${r[1]}" placeholder="例 ${[120,95,60,25,8][i]}" aria-label="測定値${i+1}"></td><td id="mr${i}" style="font-family:var(--f-mono)">—</td></tr>`).join('');
+for(let i=0;i<5;i++){ ['md','mv'].forEach(p=>$('#'+p+i).addEventListener('input',()=>{ MEAS[i]=[$('#md'+i).value,$('#mv'+i).value]; try{localStorage.setItem('sps-meas',JSON.stringify(MEAS));}catch(e){} exp1(); })); }
+function exp1(){
+  const d=val('e-d'), obs=$('#e-obs').value, fog=val('e-fog'), div=val('e-div'), cell=val('e-cell');
+  out('e-d', d.toFixed(1)+' m'); out('e-fog', fog+'%'); out('e-div', div+' mrad'); out('e-cell', cell+' mm');
+  $('#e-fog').disabled = obs!=='fog';
+  const fr = e1frac(d,obs,fog,div,cell);
+  $('#e-frac').textContent = sig(fr*100,3)+'%';
+  const uw = fr*1e-3*0.2*1e6; $('#e-pw').textContent = sig(uw,3)+' µW';
+  $('#e-spot').textContent = obs==='frost' ? fmtLen(2*(1e-3+Math.max(0,d-0.05)*Math.tan(15*Math.PI/180)))+'（散乱）' : fmtLen(2*(1e-3+d*div*1e-3/2));
+  const cv=$('#e-cv'); const {ctx,w,h}=canvas(cv, 240); const x0=56,y0=12,pw=w-72,ph=h-46;
+  const A=axes(ctx,{x0,y0,w:pw,h:ph,xmin:0,xmax:10,ymin:1e-3,ymax:100,ylog:true,xticks:[0,2,4,6,8,10],xfmt:v=>v+'m',yticks:[1e-3,1e-2,0.1,1,10,100],yfmt:v=>v+'%',xlabel:'距離'});
+  const ds=[]; for(let x=0.1;x<=10.0001;x+=0.05) ds.push(x);
+  Object.keys(OBS).forEach(k=>{ ctx.save(); ctx.globalAlpha=k===obs?1:.35; line(ctx, ds.map(x=>[A.X(x),A.Y(clamp(e1frac(x,k,fog,div,cell)*100,1e-3,100))]), css(OBS[k]), k===obs?2.5:1.5); ctx.restore(); });
+  dot(ctx,A.X(d),A.Y(clamp(fr*100,1e-3,100)),5,css(OBS[obs]),css('--surface'));
+  // 測定値
+  const rows = MEAS.map(r=>[parseFloat(r[0]),parseFloat(r[1])]);
+  const base = rows.find(r=>isFinite(r[0])&&isFinite(r[1])&&r[1]>0);
+  rows.forEach((r,i)=>{ const cell_=$('#mr'+i);
+    if(!base || !isFinite(r[0]) || !isFinite(r[1]) || r[0]<=0){ cell_.textContent='—'; return; }
+    const pred = e1frac(r[0],obs,fog,div,cell)/e1frac(base[0],obs,fog,div,cell);
+    const meas = r[1]/base[1]; cell_.textContent = sig(meas/pred,2)+' 倍';
+    const y = e1frac(base[0],obs,fog,div,cell)*meas*100;
+    if(r[0]<=10) dot(ctx,A.X(r[0]),A.Y(clamp(y,1e-3,100)),4.5,css('--ink'));
+  });
+}
+bind(['e-d','e-obs','e-fog','e-div','e-cell'], exp1);
+
+// ---------- §7 実験2 ----------
+const Q = { light:{x:20,y:10}, pan:90, tilt:90, act:{x:0,y:0}, timer:0, ph:0, read:[0,0,0,0], drag:false };
+function qRead(){
+  const off=12, wdt=22, nz=val('q-noise');
+  const H={x:Q.act.x, y:Q.act.y};
+  const ax=[[-off,off],[off,off],[-off,-off],[off,-off]]; // TL TR BL BR
+  return ax.map(([ox,oy])=>{ const dx=Q.light.x-(H.x+ox), dy=Q.light.y-(H.y+oy);
+    return Math.round(clamp(60 + 900*Math.exp(-(dx*dx+dy*dy)/(2*wdt*wdt)) + nz*gauss(), 0, 1023)); });
+}
+function qStep(dt){
+  if($('#q-auto').checked && !Q.drag){ Q.ph += dt*val('q-spd')/40; Q.light.x = 45*Math.sin(Q.ph*1.0); Q.light.y = 30*Math.sin(Q.ph*1.7+0.5); }
+  // サーボは 0.1秒/60° で指令値に近づく
+  const tx=Q.pan-90, ty=Q.tilt-90, vmax=600*dt;
+  Q.act.x += clamp(tx-Q.act.x,-vmax,vmax); Q.act.y += clamp(ty-Q.act.y,-vmax,vmax);
+  Q.timer += dt*1000;
+  const period = val('q-dly') + 1;
+  while(Q.timer >= period){ Q.timer -= period;
+    const [tl,tr,bl,br] = Q.read = qRead();
+    const dx=(tr+br)-(tl+bl), dy=(tl+tr)-(bl+br), div=val('q-div'), mx=val('q-max'), tol=val('q-tol');
+    if(Math.abs(dx)>tol) Q.pan += clamp(Math.trunc(dx/div),-mx,mx);
+    if(Math.abs(dy)>tol) Q.tilt += clamp(Math.trunc(dy/div),-mx,mx);
+    Q.pan=clamp(Q.pan,30,150); Q.tilt=clamp(Q.tilt,30,150);
+  }
+}
+function qCode(){
+  return `#include <Servo.h>
+
+Servo pan, tilt;
+int panPos = 90, tiltPos = 90;
+
+const int DIV  = ${val('q-div')};   // 感度：差をこの数で割って角度にする
+const int MAXS = ${val('q-max')};    // 1回に動かす最大角度 [°]
+const int TOL  = ${val('q-tol')};   // 不感帯：差がこれ以下なら動かさない
+const int DLY  = ${val('q-dly')};   // ループの待ち時間 [ms]
+
+void setup() {
+  pan.attach(9);
+  tilt.attach(10);
+  pan.write(panPos);
+  tilt.write(tiltPos);
+}
+
+void loop() {
+  int tl = analogRead(A0);  // 左上
+  int tr = analogRead(A1);  // 右上
+  int bl = analogRead(A2);  // 左下
+  int br = analogRead(A3);  // 右下
+
+  int dx = (tr + br) - (tl + bl);  // 右が明るいと正
+  int dy = (tl + tr) - (bl + br);  // 上が明るいと正
+
+  if (abs(dx) > TOL) panPos  += constrain(dx / DIV, -MAXS, MAXS);
+  if (abs(dy) > TOL) tiltPos += constrain(dy / DIV, -MAXS, MAXS);
+
+  // 取り付け向きで逆に動くときは += を -= に変える
+  panPos  = constrain(panPos, 0, 180);
+  tiltPos = constrain(tiltPos, 0, 180);
+  pan.write(panPos);
+  tilt.write(tiltPos);
+  delay(DLY);
+}`;
+}
+let lastCode='';
+function qDraw(){
+  out('q-spd', val('q-spd')); out('q-div', val('q-div')); out('q-max', val('q-max')+'°'); out('q-tol', val('q-tol')); out('q-dly', val('q-dly')+' ms'); out('q-noise', '±'+val('q-noise'));
+  const err = Math.hypot(Q.light.x-Q.act.x, Q.light.y-Q.act.y);
+  $('#q-state').innerHTML = err<6 ? '<span class="pill good">追尾中</span>' : err<20 ? '<span class="pill warn">追いかけ中</span>' : '<span class="pill bad">見失いかけ</span>';
+  $('#q-err').textContent = err.toFixed(1)+'°';
+  $('#q-servo').textContent = `${Q.pan}°, ${Q.tilt}°`;
+  const names=['A0 左上','A1 右上','A2 左下','A3 右下'];
+  $('#q-sens').innerHTML = Q.read.map((v,i)=>`<div><i style="width:${v/1023*100}%"></i><span>${names[i]}　${String(v).padStart(4,' ')}</span></div>`).join('');
+  const code = qCode(); if(code!==lastCode){ $('#q-code').textContent=code; lastCode=code; }
+  const cv=$('#q-cv'); const sz=Math.min(cv.parentElement.clientWidth-28, 340); cv.style.width=sz+'px'; const {ctx,w,h}=canvas(cv, sz);
+  const R=60, S=w/(2*R), X=x=>w/2+x*S, Y=y=>h/2-y*S;
+  ctx.strokeStyle=css('--line'); ctx.lineWidth=1; for(let g=-60;g<=60;g+=15){ ctx.beginPath(); ctx.moveTo(X(g),0); ctx.lineTo(X(g),h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,Y(g)); ctx.lineTo(w,Y(g)); ctx.stroke(); }
+  const L=Q.light; const g=ctx.createRadialGradient(X(L.x),Y(L.y),0,X(L.x),Y(L.y),18*S); g.addColorStop(0,css('--sun')); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(X(L.x),Y(L.y),18*S,0,Math.PI*2); ctx.fill();
+  dot(ctx,X(L.x),Y(L.y),5,css('--sun'),css('--ink'));
+  const H=Q.act; ctx.strokeStyle=css('--accent'); ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(X(H.x),Y(H.y),12*S,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(H.x)-16*S,Y(H.y)); ctx.lineTo(X(H.x)+16*S,Y(H.y)); ctx.moveTo(X(H.x),Y(H.y)-16*S); ctx.lineTo(X(H.x),Y(H.y)+16*S); ctx.stroke();
+  label(ctx,'センサーの向き',X(H.x)+13*S,Y(H.y)+13*S,css('--accent'),'left','top','11px '+SANS);
+  label(ctx,'±60°',w-4,h-4,css('--muted'),'right','bottom','10px '+MONO);
+}
+(function(){ const cv=$('#q-cv');
+  const set = e => { const r=cv.getBoundingClientRect(); const S=r.width/120; Q.light.x=clamp((e.clientX-r.left)/S-60,-58,58); Q.light.y=clamp(60-(e.clientY-r.top)/S,-58,58); };
+  cv.addEventListener('pointerdown', e=>{ $('#q-auto').checked=false; Q.drag=true; cv.setPointerCapture(e.pointerId); set(e); });
+  cv.addEventListener('pointermove', e=>{ if(Q.drag) set(e); });
+  cv.addEventListener('pointerup', ()=>{ Q.drag=false; });
+})();
+$('#q-copy').onclick = () => { const txt=$('#q-code').textContent; const b=$('#q-copy');
+  navigator.clipboard.writeText(txt).then(()=>{ b.textContent='コピーしました'; setTimeout(()=>b.textContent='コピー',1500); })
+  .catch(()=>{ const r=document.createRange(); r.selectNodeContents($('#q-code')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent='選択しました'; setTimeout(()=>b.textContent='コピー',1500); }); };
+
+// ---------- タブと描画ループ ----------
+const DRAW = { beam, mwl, wire, track:trackDraw, relay, exp:()=>{exp1(); qDraw();} };
+let active='beam';
+function show(tab){ active=tab;
+  document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===tab));
+  document.querySelectorAll('.panel').forEach(p=>p.hidden = p.id!=='p-'+tab);
+  try{ localStorage.setItem('sps-tab',tab); }catch(e){}
+  DRAW[tab]();
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab)));
+let start='beam'; const hash=location.hash.slice(1);
+if(DRAW[hash]) start=hash; else { try{ const s=localStorage.getItem('sps-tab'); if(DRAW[s]) start=s; }catch(e){} }
+let last=performance.now();
+function loop(now){ const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(active==='track'){ const n=4; for(let i=0;i<n;i++) trackStep(dt/n); trackDraw(); }
+  if(active==='exp'){ qStep(dt); qDraw(); }
+  requestAnimationFrame(loop); }
+const redraw = () => DRAW[active]();
+window.addEventListener('resize', redraw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts) document.fonts.ready.then(redraw);
+// 他タブの値を先に計算（§6 は §3 の仮定を使う）
+mwl(); wire();
+show(start);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
